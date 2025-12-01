@@ -128,6 +128,10 @@ class AnesthesiaRecordApp {
                 
                 if (settings.vitaldbUsername) document.getElementById('vitaldbUsername').value = settings.vitaldbUsername;
                 if (settings.vitaldbVrcode) document.getElementById('vitaldbVrcode').value = settings.vitaldbVrcode;
+                if (settings.vitalrecorderDirectory) {
+                    document.getElementById('vitalrecorderDirectory').value = settings.vitalrecorderDirectory;
+                    this.vitalRecorderConfig.vitaldbDirectory = settings.vitalrecorderDirectory;
+                }
             }
         } catch (error) {
             console.error('Failed to load settings:', error);
@@ -143,7 +147,8 @@ class AnesthesiaRecordApp {
                 vitalUpdateInterval: document.getElementById('vitalUpdateInterval').value,
                 dataSource: document.getElementById('dataSource').value,
                 vitaldbUsername: document.getElementById('vitaldbUsername').value,
-                vitaldbVrcode: document.getElementById('vitaldbVrcode').value
+                vitaldbVrcode: document.getElementById('vitaldbVrcode').value,
+                vitalrecorderDirectory: document.getElementById('vitalrecorderDirectory').value
             };
             
             ['remarks', 'drugs', 'fluids', 'settings', 'vitals', 'remarks-display', 'drugs-display', 'fluids-display'].forEach(sectionName => {
@@ -343,6 +348,19 @@ class AnesthesiaRecordApp {
         document.getElementById('vitalrecorderSamplingRate').addEventListener('change', (e) => {
             this.vitalRecorderConfig.samplingRateHz = parseFloat(e.target.value);
             this.updateVitalRecorderConfig();
+            this.saveSettings();
+        });
+
+        document.getElementById('updateVitalrecorderDirectory').addEventListener('click', async () => {
+            const directoryInput = document.getElementById('vitalrecorderDirectory');
+            const directory = directoryInput.value.trim();
+            if (directory) {
+                await this.updateVitalRecorderDirectory(directory);
+                this.saveSettings();
+            }
+        });
+
+        document.getElementById('vitalrecorderDirectory').addEventListener('change', () => {
             this.saveSettings();
         });
 
@@ -1800,6 +1818,13 @@ class AnesthesiaRecordApp {
                 this.isVitalRecorderConnected = true;
                 console.log('VitalRecorder connected successfully, isVitalRecorderConnected:', this.isVitalRecorderConnected);
                 this.updateVitalRecorderStatus('接続済み', 'connected');
+                
+                const savedDirectory = this.vitalRecorderConfig.vitaldbDirectory || document.getElementById('vitalrecorderDirectory').value;
+                if (savedDirectory && savedDirectory.trim()) {
+                    console.log('Sending saved directory to backend:', savedDirectory);
+                    await this.updateVitalRecorderDirectory(savedDirectory);
+                }
+                
                 console.log('About to refresh parameters after connection');
                 await this.refreshVitalRecorderParameters();
                 this.startVitalRecorderStatusMonitoring();
@@ -1878,6 +1903,65 @@ class AnesthesiaRecordApp {
             });
         } catch (error) {
             console.error('Error updating VitalRecorder config:', error);
+        }
+    }
+
+    async updateVitalRecorderDirectory(directory) {
+        console.log('Updating VitalRecorder directory to:', directory);
+        const currentVitalFileDiv = document.getElementById('currentVitalFile');
+        
+        try {
+            const response = await fetch(`${this.vitalRecorderConfig.serviceURL}/api/config`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    vitaldb_directory: directory
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('Directory update response:', data);
+                this.vitalRecorderConfig.vitaldbDirectory = directory;
+                
+                if (currentVitalFileDiv) {
+                    currentVitalFileDiv.textContent = 'フォルダ更新完了';
+                    currentVitalFileDiv.style.color = '#00CC00';
+                }
+                
+                await this.refreshVitalRecorderParameters();
+                
+                const statusResponse = await fetch(`${this.vitalRecorderConfig.serviceURL}/api/status`);
+                if (statusResponse.ok) {
+                    const statusData = await statusResponse.json();
+                    if (statusData.current_file) {
+                        if (currentVitalFileDiv) {
+                            const fileName = statusData.current_file.split('/').pop().split('\\').pop();
+                            currentVitalFileDiv.textContent = `現在のファイル: ${fileName}`;
+                            currentVitalFileDiv.style.color = '#00CC00';
+                        }
+                    } else {
+                        if (currentVitalFileDiv) {
+                            currentVitalFileDiv.textContent = 'バイタルファイルが見つかりません';
+                            currentVitalFileDiv.style.color = '#FF6600';
+                        }
+                    }
+                }
+            } else {
+                console.error('Failed to update directory:', response.status);
+                if (currentVitalFileDiv) {
+                    currentVitalFileDiv.textContent = 'フォルダ更新失敗';
+                    currentVitalFileDiv.style.color = '#FF0000';
+                }
+            }
+        } catch (error) {
+            console.error('Error updating VitalRecorder directory:', error);
+            if (currentVitalFileDiv) {
+                currentVitalFileDiv.textContent = '接続エラー';
+                currentVitalFileDiv.style.color = '#FF0000';
+            }
         }
     }
 

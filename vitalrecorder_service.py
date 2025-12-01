@@ -54,7 +54,8 @@ class VitalRecorderMonitor:
                 'last_check': self.last_file_check.isoformat() if self.last_file_check else None,
                 'file_age_alert': self.check_file_age_alert(),
                 'data_delay_seconds': self.data_delay_seconds,
-                'sampling_rate_hz': self.sampling_rate_hz
+                'sampling_rate_hz': self.sampling_rate_hz,
+                'vitaldb_directory': self.vitaldb_directory
             })
 
         @self.app.route('/api/config', methods=['POST'])
@@ -65,7 +66,19 @@ class VitalRecorderMonitor:
                 self.data_delay_seconds = int(data['data_delay_seconds'])
             if 'sampling_rate_hz' in data:
                 self.sampling_rate_hz = float(data['sampling_rate_hz'])
-            return jsonify({'success': True})
+            if 'vitaldb_directory' in data:
+                new_directory = data['vitaldb_directory']
+                if new_directory and new_directory.strip():
+                    self.vitaldb_directory = new_directory.strip()
+                    logger.info(f"VitalDB directory updated to: {self.vitaldb_directory}")
+                    self.current_vital_file = None
+                    self.available_parameters = []
+                    latest_file = self.find_latest_vital_file()
+                    if latest_file:
+                        self.current_vital_file = latest_file
+                        self.load_vital_file_info(latest_file)
+                        logger.info(f"Loaded {len(self.available_parameters)} parameters from new directory")
+            return jsonify({'success': True, 'vitaldb_directory': self.vitaldb_directory})
 
         @self.app.route('/api/parameters', methods=['GET'])
         def get_available_parameters():

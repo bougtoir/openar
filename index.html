@@ -117,6 +117,10 @@
                     </div>
 
                     <div class="setting-group vitalrecorder-settings" id="vitalrecorderSettings">
+                        <label>VitalRecorderデータフォルダ:</label>
+                        <input type="text" id="vitalrecorderDirectory" placeholder="C:/Users/username/Downloads/vitaldb">
+                        <button id="updateVitalrecorderDirectory" class="small-btn">フォルダ更新</button>
+                        <div id="currentVitalFile" class="status-indicator" style="font-size: 11px; margin-top: 5px;"></div>
                         <label>データ遅延 (秒):</label>
                         <input type="number" id="vitalrecorderDelay" value="1" min="1" max="60">
                         <label>サンプリング周波数 (Hz):</label>
