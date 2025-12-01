@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>電子麻酔記録システム</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <div id="panel1" class="panel panel-left">
+            <div class="section remarks-section">
+                <div class="section-header" onclick="app.toggleSection('remarks')">
+                    <span>リマークス</span>
+                    <span class="collapse-icon expanded">-</span>
+                </div>
+                <div class="section-content expanded" id="remarks-content">
+                    <div class="input-group">
+                        <select id="remarksSelect">
+                            <option value="">リマークスを選択</option>
+                        </select>
+                        <input type="text" id="remarksCustom" placeholder="自由記載">
+                        <textarea id="remarksMemo" rows="2" placeholder="メモ"></textarea>
+                        <input type="time" id="remarksTime" placeholder="現在時刻">
+                        <button id="addRemarks">追加</button>
+                    </div>
+                    <div class="quick-buttons">
+                        <button id="anesthesiaStart">麻酔開始</button>
+                        <button id="anesthesiaEnd">麻酔終了</button>
+                        <button id="surgeryStart">手術開始</button>
+                        <button id="surgeryEnd">手術終了</button>
+                        <button id="roomStart">手術室開始</button>
+                        <button id="roomEnd">手術室終了</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section drugs-section">
+                <div class="section-header" onclick="app.toggleSection('drugs')">
+                    <span>薬剤</span>
+                    <span class="collapse-icon expanded">-</span>
+                </div>
+                <div class="section-content expanded" id="drugs-content">
+                    <div class="input-group">
+                        <select id="drugSelect">
+                            <option value="">薬剤を選択</option>
+                        </select>
+                        <input type="number" id="drugDose" placeholder="投与量" step="0.1">
+                        <input type="time" id="drugTime" placeholder="現在時刻">
+                        <button id="addDrug">投与</button>
+                    </div>
+                    <div class="drug-rows" id="drugRows">
+                    </div>
+                </div>
+            </div>
+
+            <div class="section ivfluid-section">
+                <div class="section-header" onclick="app.toggleSection('fluids')">
+                    <span>輸液</span>
+                    <span class="collapse-icon expanded">-</span>
+                </div>
+                <div class="section-content expanded" id="fluids-content">
+                    <div class="input-group">
+                        <select id="fluidSelect">
+                            <option value="">輸液を選択</option>
+                        </select>
+                        <input type="number" id="fluidVolume" placeholder="開始時残量(ml)">
+                        <input type="time" id="fluidTime" placeholder="現在時刻">
+                        <button id="addFluid">開始</button>
+                    </div>
+                    <div class="fluid-rows" id="fluidRows">
+                    </div>
+                </div>
+            </div>
+
+            <div class="section settings-section">
+                <div class="section-header" onclick="app.toggleSection('settings')">
+                    <span>接続設定</span>
+                    <span class="collapse-icon collapsed">+</span>
+                </div>
+                <div class="section-content collapsed" id="settings-content">
+                    <div class="setting-group">
+                        <label>時間枠:</label>
+                        <select id="timeFrame">
+                            <option value="2" selected>2時間</option>
+                            <option value="4">4時間</option>
+                            <option value="8">8時間</option>
+                            <option value="16">16時間</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label>薬剤表示数:</label>
+                        <select id="drugDisplayCount">
+                            <option value="10" selected>10アイテム</option>
+                            <option value="20">20アイテム</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label>バイタル更新間隔:</label>
+                        <select id="vitalUpdateInterval">
+                            <option value="10" selected>10秒</option>
+                            <option value="30">30秒</option>
+                            <option value="60">1分</option>
+                            <option value="120">2分</option>
+                        </select>
+                    </div>
+
+                    <div class="setting-group vitaldb-settings" id="vitaldbSettings" style="display: none;">
+                        <label>VitalDB ユーザー名:</label>
+                        <input type="text" id="vitaldbUsername" placeholder="ユーザー名">
+                        <label>VitalDB パスワード:</label>
+                        <input type="password" id="vitaldbPassword" placeholder="パスワード">
+                        <label>VRコード (9桁):</label>
+                        <input type="text" id="vitaldbVrcode" placeholder="123456789" maxlength="9">
+                        <button id="connectVitalDB">VitalDB接続</button>
+                        <div id="vitaldbStatus" class="status-indicator"></div>
+                    </div>
+
+                    <div class="setting-group vitalrecorder-settings" id="vitalrecorderSettings">
+                        <label>データ遅延 (秒):</label>
+                        <input type="number" id="vitalrecorderDelay" value="1" min="1" max="60">
+                        <label>サンプリング周波数 (Hz):</label>
+                        <input type="number" id="vitalrecorderSamplingRate" value="10" min="0.1" max="10" step="0.1">
+                        <div id="vitalrecorderStatus" class="status-indicator">接続中...</div>
+                        <div id="fileAgeAlert" class="alert-indicator" style="display: none;"></div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="acquisitionToggle">
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label">取得開始</span>
+                        </label>
+                    </div>
+
+                </div>
+            </div>
+
+
+
+        </div>
+
+        <div id="panel2" class="panel panel-main">
+            <div class="section drugs-display-section">
+                <div class="section-header" onclick="app.toggleSection('drugs-display')">
+                    <span>薬剤</span>
+                    <span class="collapse-icon expanded">-</span>
+                </div>
+                <div class="section-content expanded" id="drugs-display-content">
+                    <div class="display-section drug-display">
+                        <div class="timeline-grid" id="drugTimeline">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section fluids-display-section">
+                <div class="section-header" onclick="app.toggleSection('fluids-display')">
+                    <span>輸液</span>
+                    <span class="collapse-icon expanded">-</span>
+                </div>
+                <div class="section-content expanded" id="fluids-display-content">
+                    <div class="display-section fluid-display">
+                        <div class="timeline-grid" id="fluidTimeline">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section remarks-display-section">
+                <div class="section-header" onclick="app.toggleSection('remarks-display')">
+                    <span>イベント</span>
+                    <span class="collapse-icon expanded">-</span>
+                </div>
+                <div class="section-content expanded" id="remarks-display-content">
+                    <div class="display-section remarks-display">
+                        <div class="event-list" id="eventList">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section cost-display-section">
+                <div class="section-header" onclick="app.toggleSection('cost-display')">
+                    <span>コスト</span>
+                    <span class="collapse-icon expanded">-</span>
+                </div>
+                <div class="section-content expanded" id="cost-display-content">
+                    <div class="display-section cost-display">
+                        <div class="cost-summary" id="costSummary">
+                            <div class="total-cost">総コスト: ¥<span id="totalCostValue">0</span></div>
+                        </div>
+                        <div class="cost-breakdown" id="costBreakdown">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="panel3" class="panel panel-chart">
+            <div class="section-header" onclick="app.toggleChartSection()">
+                <span>バイタルサイン</span>
+                <span class="collapse-icon expanded" id="chart-collapse-icon">-</span>
+            </div>
+            <div class="chart-container" id="chart-container">
+                <div class="chart-vital-values" id="currentVitalValues">
+                </div>
+                <div class="chart-range-labels" id="chartRangeLabels">
+                </div>
+                <canvas id="vitalChart"></canvas>
+                
+                <div class="section timeseries-section">
+                    <div class="section-header" onclick="app.toggleSection('timeseries')">
+                        <span>時系列データ</span>
+                        <span class="collapse-icon collapsed">+</span>
+                    </div>
+                    <div class="section-content collapsed" id="timeseries-content">
+                        <div class="timeseries-controls">
+                            <button id="refreshTimeseriesBtn">データ更新</button>
+                            <select id="timeseriesRange">
+                                <option value="60">過去1時間</option>
+                                <option value="120" selected>過去2時間</option>
+                                <option value="240">過去4時間</option>
+                                <option value="480">過去8時間</option>
+                            </select>
+                        </div>
+                        <div class="timeseries-table-container">
+                            <table id="timeseriesTable" class="timeseries-table">
+                                <thead>
+                                    <tr>
+                                        <th>時刻</th>
+                                        <th>心拍数</th>
+                                        <th>収縮期血圧</th>
+                                        <th>拡張期血圧</th>
+                                        <th>酸素飽和度</th>
+                                        <th>体温</th>
+                                        <th>呼吸数</th>
+                                        <th>呼気CO2</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="timeseriesTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">編集</h3>
+                <span class="close" onclick="app.closeEditModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="editForm">
+                    <!-- Dynamic form content will be inserted here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="app.saveEdit()">保存</button>
+                <button onclick="app.closeEditModal()">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="node_modules/chart.js/dist/chart.umd.js"></script>
+    <script src="renderer.js"></script>
+</body>
+</html>

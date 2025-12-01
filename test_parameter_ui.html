@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VitalRecorder Parameter Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        button { padding: 10px 15px; margin: 5px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .connected { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .warning { background-color: #fff3cd; color: #856404; }
+        #parameterMappingList { margin-top: 15px; }
+        .parameter-mapping-item { border: 1px solid #ddd; padding: 10px; margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>VitalRecorder Parameter Update Test</h1>
+    
+    <div class="test-section">
+        <h2>Connection Test</h2>
+        <button onclick="testConnection()">Test VitalRecorder Connection</button>
+        <div id="connectionStatus" class="status">未接続</div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Parameter Update Test</h2>
+        <button onclick="testParameterUpdate()">Test Parameter Update</button>
+        <div id="parameterStatus" class="status">パラメータ未取得</div>
+        <div id="parameterMappingList">
+            <p>パラメータを取得してください</p>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Debug Console</h2>
+        <div id="debugOutput" style="background: #f5f5f5; padding: 10px; height: 200px; overflow-y: scroll; font-family: monospace; font-size: 12px;"></div>
+    </div>
+
+    <script>
+        let isVitalRecorderConnected = false;
+        const serviceURL = 'http://localhost:5001';
+        let availableParameters = [];
+
+        function log(message) {
+            const debugOutput = document.getElementById('debugOutput');
+            const timestamp = new Date().toLocaleTimeString();
+            debugOutput.innerHTML += `[${timestamp}] ${message}\n`;
+            debugOutput.scrollTop = debugOutput.scrollHeight;
+            console.log(message);
+        }
+
+        async function testConnection() {
+            log('Testing VitalRecorder connection...');
+            try {
+                const response = await fetch(`${serviceURL}/api/start-monitoring`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                log(`Connection response status: ${response.status}, OK: ${response.ok}`);
+
+                if (response.ok) {
+                    isVitalRecorderConnected = true;
+                    log('VitalRecorder connected successfully');
+                    document.getElementById('connectionStatus').textContent = '接続済み';
+                    document.getElementById('connectionStatus').className = 'status connected';
+                } else {
+                    const errorText = await response.text();
+                    log(`Connection failed: ${errorText}`);
+                    document.getElementById('connectionStatus').textContent = '接続失敗';
+                    document.getElementById('connectionStatus').className = 'status error';
+                }
+            } catch (error) {
+                log(`Connection error: ${error.message}`);
+                document.getElementById('connectionStatus').textContent = '接続エラー';
+                document.getElementById('connectionStatus').className = 'status error';
+            }
+        }
+
+        async function testParameterUpdate() {
+            log('Testing parameter update...');
+            
+            if (!isVitalRecorderConnected) {
+                log('Not connected to VitalRecorder, skipping parameter refresh');
+                document.getElementById('parameterStatus').textContent = '未接続 - 先に接続してください';
+                document.getElementById('parameterStatus').className = 'status warning';
+                return;
+            }
+
+            try {
+                log(`Fetching parameters from: ${serviceURL}/api/parameters`);
+                const response = await fetch(`${serviceURL}/api/parameters`);
+                log(`Response status: ${response.status}, OK: ${response.ok}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`Received parameter data: ${JSON.stringify(data)}`);
+                    log(`Parameters array: ${JSON.stringify(data.parameters)}`);
+                    log(`Parameters length: ${data.parameters ? data.parameters.length : 'undefined'}`);
+                    
+                    availableParameters = data.parameters || [];
+                    log(`Set availableParameters to: ${JSON.stringify(availableParameters)}`);
+                    
+                    document.getElementById('parameterStatus').textContent = `パラメータ取得成功 (${availableParameters.length}個)`;
+                    document.getElementById('parameterStatus').className = 'status connected';
+                    
+                    renderParameterMappingUI();
+                } else {
+                    const errorText = await response.text();
+                    log(`Failed to fetch parameters, status: ${response.status}, error: ${errorText}`);
+                    document.getElementById('parameterStatus').textContent = 'パラメータ取得失敗';
+                    document.getElementById('parameterStatus').className = 'status error';
+                }
+            } catch (error) {
+                log(`Error fetching parameters: ${error.message}`);
+                log(`Error stack: ${error.stack}`);
+                document.getElementById('parameterStatus').textContent = 'パラメータ取得エラー';
+                document.getElementById('parameterStatus').className = 'status error';
+            }
+        }
+
+        function renderParameterMappingUI() {
+            log('renderParameterMappingUI called');
+            const container = document.getElementById('parameterMappingList');
+            log(`Container element: ${container ? 'found' : 'not found'}`);
+            
+            if (!container) {
+                log('parameterMappingList container not found!');
+                return;
+            }
+            
+            container.innerHTML = '';
+
+            log(`Available parameters: ${JSON.stringify(availableParameters)}`);
+            log(`Available parameters length: ${availableParameters ? availableParameters.length : 'undefined'}`);
+
+            if (!availableParameters || availableParameters.length === 0) {
+                log('No parameters available, showing message');
+                container.innerHTML = '<p>利用可能なパラメータがありません</p>';
+                return;
+            }
+
+            log(`Rendering ${availableParameters.length} parameters`);
+            
+            availableParameters.forEach((param, index) => {
+                log(`Rendering parameter ${index}: ${JSON.stringify(param)}`);
+                
+                if (!param || !param.name) {
+                    log(`Invalid parameter object: ${JSON.stringify(param)}`);
+                    return;
+                }
+                
+                const mappingDiv = document.createElement('div');
+                mappingDiv.className = 'parameter-mapping-item';
+                
+                mappingDiv.innerHTML = `
+                    <div class="parameter-info">
+                        <strong>${param.display_name || param.name}</strong> (${param.name})
+                        <span class="parameter-unit">${param.unit || ''}</span>
+                    </div>
+                    <div class="mapping-controls">
+                        <label>
+                            <input type="checkbox" data-param="${param.name}">
+                            使用する
+                        </label>
+                        <select data-param="${param.name}">
+                            <option value="">ラベルを選択</option>
+                            <option value="HR">心拍数 (HR)</option>
+                            <option value="SpO2">酸素飽和度 (SpO2)</option>
+                            <option value="SBP">収縮期血圧 (SBP)</option>
+                            <option value="DBP">拡張期血圧 (DBP)</option>
+                            <option value="TEMP">体温 (TEMP)</option>
+                            <option value="RR">呼吸数 (RR)</option>
+                            <option value="ETCO2">呼気終末CO2 (ETCO2)</option>
+                        </select>
+                    </div>
+                `;
+                
+                container.appendChild(mappingDiv);
+                log(`Parameter ${param.name} rendered successfully`);
+            });
+            
+            log('Parameter mapping UI rendering complete');
+        }
+
+        log('Test page loaded successfully');
+    </script>
+</body>
+</html>

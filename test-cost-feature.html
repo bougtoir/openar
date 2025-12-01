@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cost Feature Test</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <div class="panel panel1">
+            <h3>Test Controls</h3>
+            <button onclick="loadTestData()">Load Test Data</button>
+            <button onclick="addTestDrug()">Add Test Drug</button>
+            <button onclick="addTestFluid()">Add Test Fluid</button>
+            <button onclick="addTestRemark()">Add Test Remark</button>
+        </div>
+        
+        <div class="panel panel2">
+            <div class="section cost-display-section">
+                <div class="section-header" onclick="app.toggleSection('cost-display')">
+                    <span>コスト</span>
+                    <span class="collapse-icon expanded">-</span>
+                </div>
+                <div class="section-content expanded" id="cost-display-content">
+                    <div class="display-section cost-display">
+                        <div class="cost-summary" id="costSummary">
+                            <div class="total-cost">総コスト: ¥<span id="totalCostValue">0</span></div>
+                        </div>
+                        <div class="cost-breakdown" id="costBreakdown">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="panel panel3">
+            <h3>Test Results</h3>
+            <div id="testResults"></div>
+        </div>
+    </div>
+
+    <script>
+        // Simplified version of the AnesthesiaRecordApp for testing
+        class TestApp {
+            constructor() {
+                this.drugs = [];
+                this.ivFluids = [];
+                this.remarks = [];
+                this.drugConfig = [];
+                this.ivFluidConfig = [];
+                this.remarksConfig = [];
+            }
+
+            calculateDrugCost(drug, drugConfig) {
+                if (!drugConfig.price_per_unit || !drugConfig.cost_unit) return 0;
+                
+                let totalUsage = 0;
+                if (drugConfig.continuous && drug.endTime) {
+                    const durationMinutes = Math.floor((drug.endTime - drug.time) / (1000 * 60));
+                    totalUsage = drug.dose * durationMinutes;
+                } else if (!drugConfig.continuous) {
+                    totalUsage = drug.dose;
+                } else {
+                    const durationMinutes = Math.floor((new Date() - drug.time) / (1000 * 60));
+                    totalUsage = drug.dose * durationMinutes;
+                }
+                
+                const units = Math.ceil(totalUsage / drugConfig.cost_unit);
+                return units * drugConfig.price_per_unit;
+            }
+
+            calculateFluidCost(fluid, fluidConfig) {
+                if (!fluidConfig.price_per_unit || !fluidConfig.unit) return 0;
+                
+                const units = Math.ceil(fluid.initialVolume / fluidConfig.unit);
+                return units * fluidConfig.price_per_unit;
+            }
+
+            calculateRemarkCost(remark, remarkConfig) {
+                if (!remarkConfig.price_per_unit || !remarkConfig.unit) return 0;
+                
+                const endEvent = this.remarks.find(r => 
+                    (remark.text.includes('麻酔開始') && r.text.includes('麻酔終了')) ||
+                    (remark.text.includes('手術開始') && r.text.includes('手術終了')) ||
+                    (remark.text.includes('手術室開始') && r.text.includes('手術室終了'))
+                );
+                
+                if (!endEvent) return 0;
+                
+                const durationMinutes = Math.floor((endEvent.time - remark.time) / (1000 * 60));
+                const units = Math.ceil(durationMinutes / remarkConfig.unit);
+                return units * remarkConfig.price_per_unit;
+            }
+
+            calculateTotalCosts() {
+                const costs = {
+                    drugs: [],
+                    fluids: [],
+                    remarks: [],
+                    total: 0
+                };
+
+                this.drugs.forEach(drug => {
+                    const drugConfig = this.drugConfig.find(d => d.name === drug.name);
+                    if (drugConfig) {
+                        const cost = this.calculateDrugCost(drug, drugConfig);
+                        if (cost > 0) {
+                            costs.drugs.push({
+                                name: drug.name,
+                                time: drug.time,
+                                cost: cost,
+                                details: drugConfig.continuous ? '持続投与' : '単回投与'
+                            });
+                            costs.total += cost;
+                        }
+                    }
+                });
+
+                this.ivFluids.forEach(fluid => {
+                    const fluidConfig = this.ivFluidConfig.find(f => f.name === fluid.name);
+                    if (fluidConfig) {
+                        const cost = this.calculateFluidCost(fluid, fluidConfig);
+                        if (cost > 0) {
+                            costs.fluids.push({
+                                name: fluid.name,
+                                time: fluid.startTime,
+                                cost: cost,
+                                details: `${fluid.initialVolume}ml`
+                            });
+                            costs.total += cost;
+                        }
+                    }
+                });
+
+                this.remarks.forEach(remark => {
+                    if (remark.text.includes('麻酔開始') || remark.text.includes('手術開始') || remark.text.includes('手術室開始')) {
+                        const remarkConfig = this.remarksConfig.find(r => r.name === remark.text);
+                        if (remarkConfig) {
+                            const cost = this.calculateRemarkCost(remark, remarkConfig);
+                            if (cost > 0) {
+                                costs.remarks.push({
+                                    name: remark.text,
+                                    time: remark.time,
+                                    cost: cost,
+                                    details: 'イベント期間'
+                                });
+                                costs.total += cost;
+                            }
+                        }
+                    }
+                });
+
+                return costs;
+            }
+
+            updateCostDisplay() {
+                const container = document.getElementById('costBreakdown');
+                const totalElement = document.getElementById('totalCostValue');
+                if (!container || !totalElement) return;
+
+                const costs = this.calculateTotalCosts();
+                
+                totalElement.textContent = costs.total.toLocaleString('ja-JP');
+                
+                container.innerHTML = '';
+
+                if (costs.drugs.length > 0) {
+                    const drugCategory = document.createElement('div');
+                    drugCategory.className = 'cost-category';
+                    drugCategory.innerHTML = '<div class="cost-category-header">薬剤</div>';
+                    
+                    costs.drugs.forEach(item => {
+                        const costItem = document.createElement('div');
+                        costItem.className = 'cost-item';
+                        costItem.innerHTML = `
+                            <div class="cost-item-info">
+                                <div class="cost-item-name">${item.name}</div>
+                                <div class="cost-item-details">${item.details}</div>
+                            </div>
+                            <div class="cost-item-time">${item.time.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}</div>
+                            <div class="cost-item-amount">¥${item.cost.toLocaleString('ja-JP')}</div>
+                        `;
+                        drugCategory.appendChild(costItem);
+                    });
+                    container.appendChild(drugCategory);
+                }
+
+                if (costs.fluids.length > 0) {
+                    const fluidCategory = document.createElement('div');
+                    fluidCategory.className = 'cost-category';
+                    fluidCategory.innerHTML = '<div class="cost-category-header">輸液</div>';
+                    
+                    costs.fluids.forEach(item => {
+                        const costItem = document.createElement('div');
+                        costItem.className = 'cost-item';
+                        costItem.innerHTML = `
+                            <div class="cost-item-info">
+                                <div class="cost-item-name">${item.name}</div>
+                                <div class="cost-item-details">${item.details}</div>
+                            </div>
+                            <div class="cost-item-time">${item.time.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}</div>
+                            <div class="cost-item-amount">¥${item.cost.toLocaleString('ja-JP')}</div>
+                        `;
+                        fluidCategory.appendChild(costItem);
+                    });
+                    container.appendChild(fluidCategory);
+                }
+
+                if (costs.remarks.length > 0) {
+                    const remarkCategory = document.createElement('div');
+                    remarkCategory.className = 'cost-category';
+                    remarkCategory.innerHTML = '<div class="cost-category-header">イベント</div>';
+                    
+                    costs.remarks.forEach(item => {
+                        const costItem = document.createElement('div');
+                        costItem.className = 'cost-item';
+                        costItem.innerHTML = `
+                            <div class="cost-item-info">
+                                <div class="cost-item-name">${item.name}</div>
+                                <div class="cost-item-details">${item.details}</div>
+                            </div>
+                            <div class="cost-item-time">${item.time.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}</div>
+                            <div class="cost-item-amount">¥${item.cost.toLocaleString('ja-JP')}</div>
+                        `;
+                        remarkCategory.appendChild(costItem);
+                    });
+                    container.appendChild(remarkCategory);
+                }
+
+                if (costs.total === 0) {
+                    container.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">コストデータがありません</div>';
+                }
+            }
+
+            toggleSection(sectionId) {
+                // Simple toggle implementation for testing
+                const content = document.getElementById(sectionId + '-content');
+                if (content) {
+                    content.style.display = content.style.display === 'none' ? 'block' : 'none';
+                }
+            }
+        }
+
+        const app = new TestApp();
+
+        function loadTestData() {
+            // Load test configuration data from CSV files
+            app.drugConfig = [
+                {name: '酸素', unit: 'L/min', continuous: true, color: '#0066CC', defaultDose: 6, cost_unit: 1, price_per_unit: 0.018},
+                {name: 'セボフレン', unit: '%', continuous: true, color: '#FF6600', defaultDose: 3, cost_unit: 1, price_per_unit: 0.86},
+                {name: 'ミダゾラム', unit: 'mg', continuous: false, color: '#9900CC', defaultDose: 5, cost_unit: 10, price_per_unit: 11.5},
+                {name: 'デクスメデトミジン', unit: 'mcg/kg/hr', continuous: true, color: '#CC0066', defaultDose: 0.5, cost_unit: 4, price_per_unit: 242.1}
+            ];
+            
+            app.ivFluidConfig = [
+                {name: '生理食塩水', unit: 100, price_per_unit: 150},
+                {name: 'リンゲル液', unit: 100, price_per_unit: 160}
+            ];
+            
+            app.remarksConfig = [
+                {name: '麻酔開始', icon: '×', color: '#FF0000', unit: 120, price_per_unit: 6000},
+                {name: '麻酔終了', icon: '×', color: '#FF0000'},
+                {name: '手術開始', icon: '◎', color: '#0066FF'},
+                {name: '手術終了', icon: '◎', color: '#0066FF'}
+            ];
+            
+            document.getElementById('testResults').innerHTML = '<p>Test data loaded successfully!</p>';
+        }
+
+        function addTestDrug() {
+            const now = new Date();
+            app.drugs.push({
+                name: 'ミダゾラム',
+                unit: 'mg',
+                dose: 5,
+                color: '#9900CC',
+                continuous: false,
+                time: now
+            });
+            
+            app.updateCostDisplay();
+            document.getElementById('testResults').innerHTML += '<p>Added ミダゾラム 5mg (non-continuous drug)</p>';
+        }
+
+        function addTestFluid() {
+            const now = new Date();
+            app.ivFluids.push({
+                name: '生理食塩水',
+                initialVolume: 500,
+                startTime: now,
+                continuous: true,
+                endTime: null,
+                endVolume: null
+            });
+            
+            app.updateCostDisplay();
+            document.getElementById('testResults').innerHTML += '<p>Added 生理食塩水 500ml</p>';
+        }
+
+        function addTestRemark() {
+            const now = new Date();
+            const endTime = new Date(now.getTime() + 2 * 60 * 60 * 1000); // 2 hours later
+            
+            app.remarks.push({
+                text: '麻酔開始',
+                icon: '×',
+                time: now,
+                startTime: now
+            });
+            
+            app.remarks.push({
+                text: '麻酔終了',
+                icon: '×',
+                time: endTime,
+                startTime: now
+            });
+            
+            app.updateCostDisplay();
+            document.getElementById('testResults').innerHTML += '<p>Added 麻酔開始/終了 (2 hour duration)</p>';
+        }
+
+        // Initialize
+        window.onload = function() {
+            loadTestData();
+            app.updateCostDisplay();
+        };
+    </script>
+</body>
+</html>

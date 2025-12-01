@@ -1,0 +1,6 @@
+vitaldb==1.5.4
+flask==3.1.0
+flask-cors==5.0.0
+numpy>=2.3.1
+pandas>=2.3.0
+requests>=2.32.4

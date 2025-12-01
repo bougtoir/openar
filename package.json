@@ -1,0 +1,49 @@
+{
+  "name": "electron-anesthesia-app",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "dist": "electron-builder --publish=never",
+    "build-win": "electron-builder --win",
+    "build-mac": "electron-builder --mac",
+    "build-linux": "electron-builder --linux",
+    "start-vitalrecorder": "python vitalrecorder_service.py",
+    "dev-with-backend": "concurrently \"npm run start-vitalrecorder\" \"npm run dev\""
+  },
+  "keywords": [
+    "anesthesia",
+    "medical",
+    "vitaldb",
+    "electron"
+  ],
+  "author": "Devin AI",
+  "license": "ISC",
+  "description": "Electronic Anesthesia Record Software with VitalDB Integration",
+
+  "dependencies": {
+    "axios": "^1.6.0",
+    "chart.js": "^4.5.0",
+    "serialport": "^12.0.0"
+  },
+  "devDependencies": {
+    "electron": "^36.5.0",
+    "electron-builder": "^26.0.12",
+    "concurrently": "^8.2.0"
+  },
+  "build": {
+    "appId": "com.devin.anesthesia-record",
+    "productName": "電子麻酔記録システム",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!node_modules/**/*",
+      "node_modules/chart.js/**/*",
+      "node_modules/serialport/**/*"
+    ]
+  }
+}

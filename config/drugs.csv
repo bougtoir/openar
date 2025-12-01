@@ -1,0 +1,7 @@
+﻿name,unit,continuous,color,defaultDose,cost_unit,price_per_unit
+酸素,L/min,TRUE,#0066CC,6,1,0.018
+セボフレン,%,TRUE,#FF6600,3,1,0.86
+ミダゾラム,mg,FALSE,#9900CC,5,10,11.5
+デクスメデトミジン,mcg/kg/hr,TRUE,#CC0066,0.5,4,242.1
+ロピバカイン,ml/hr,TRUE,#00CC66,10,100,184.9
+等比重マーカイン,ml,FALSE,#CCCC00,3,4,31.9
