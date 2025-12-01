@@ -10,7 +10,7 @@ start "VitalRecorder Service" cmd /c "python vitalrecorder_service.py"
 timeout /t 2 /nobreak > nul
 
 echo Starting Electron app...
-npm start
+".\node_modules\electron\dist\electron.exe" .
 
 echo.
 echo OpenAR has closed.
